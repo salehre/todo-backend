@@ -21,8 +21,7 @@ use Illuminate\Notifications\Notifiable;
     'verification_code',
     'verification_code_expires_at',
     'email_verified_at',
-    'theme',
-    'dark_mode',
+    'preferences',
     'gender'
 ])]
 
@@ -46,6 +45,12 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'verification_code_expires_at' => 'datetime',
+            'preferences' => 'array',
         ];
+    }
+
+    public function groups()
+    {
+        return $this->belongsToMany(Group::class, 'group_members');
     }
 }

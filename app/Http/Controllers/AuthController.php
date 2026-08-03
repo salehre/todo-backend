@@ -14,6 +14,7 @@ class AuthController extends Controller
         $credentials = $request->validate([
             'username' => 'required|string',
             'password' => 'required|string',
+            'remember' => 'sometimes|boolean',
         ]);
 
         $user = User::where('username', $credentials['username'])
@@ -24,7 +25,7 @@ class AuthController extends Controller
             return response()->json(['success' => false], 422);
         }
 
-        Auth::guard('web')->login($user);
+        Auth::guard('web')->login($user, $credentials['remember'] ?? false);
         $request->session()->regenerate();
 
         return response()->json([
@@ -189,10 +190,13 @@ class AuthController extends Controller
         $data = $request->validate([
             'theme' => 'sometimes|in:sky,emerald,orange,rose',
             'dark_mode' => 'sometimes|boolean',
+            'language' => 'sometimes|in:fa,en',
         ]);
 
         $user = $request->user();
-        $user->update($data);
+        $user->update([
+            'preferences' => array_merge($user->preferences ?? [], $data),
+        ]);
 
         return response()->json(['success' => true]);
     }
@@ -258,13 +262,15 @@ class AuthController extends Controller
     // ─── هلپر داخلی: ساخت آرایه‌ی یکسان یوزر برای همه‌ی جواب‌ها ──────────
     private function userPayload(User $user): array
     {
+        $prefs = $user->preferences ?? [];
         return [
             'name' => $user->name,
             'username' => $user->username,
             'email' => $user->email,
             'phone' => $user->phone,
-            'theme' => $user->theme,
-            'dark_mode' => (bool) $user->dark_mode,
+            'theme' => $prefs['theme'] ?? 'sky',
+            'dark_mode' => (bool) ($prefs['dark_mode'] ?? false),
+            'language' => $prefs['language'] ?? 'fa',
             'avatar_url' => $user->avatar ? asset('storage/' . $user->avatar) : null,
             'cover_url' => $user->cover ? asset('storage/' . $user->cover) : null,
             'gender' => $user->gender,
