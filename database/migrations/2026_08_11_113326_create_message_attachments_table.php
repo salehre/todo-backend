@@ -13,14 +13,10 @@ return new class extends Migration
     {
         Schema::create('message_attachments', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('message_id')
-                ->constrained('group_messages')
-                ->cascadeOnDelete();
-
+            $table->foreignId('message_id')->constrained('group_messages')->cascadeOnDelete();
             $table->enum('type', ['image', 'file', 'voice']);
-            $table->string('path', 255);
-            $table->string('name', 255);
+            $table->string('path');
+            $table->string('name');
             $table->unsignedInteger('size');
             $table->unsignedInteger('voice_duration')->nullable();
             $table->integer('position')->default(0);
@@ -28,9 +24,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('message_attachments');

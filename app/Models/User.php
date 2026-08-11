@@ -22,7 +22,7 @@ use Illuminate\Notifications\Notifiable;
     'verification_code_expires_at',
     'email_verified_at',
     'preferences',
-    'gender'
+    'gender',
     'bio',
 ])]
 

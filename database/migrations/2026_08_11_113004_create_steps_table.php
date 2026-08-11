@@ -11,19 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('feedback_messages', function (Blueprint $table) {
+        Schema::create('steps', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('name')->nullable();
-            $table->text('message');
+            $table->foreignId('task_id')->constrained()->cascadeOnDelete();
+            $table->string('text');
+            $table->boolean('completed')->default(false);
+            $table->integer('position')->default(0);
             $table->timestamps();
         });
     }
-    /**
-     * Reverse the migrations.
-     */
+
     public function down(): void
     {
-        Schema::dropIfExists('feedback_messages');
+        Schema::dropIfExists('steps');
     }
 };

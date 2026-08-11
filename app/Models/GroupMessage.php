@@ -14,7 +14,7 @@ class GroupMessage extends Model
 
     public function attachments()
     {
-        return $this->hasMany(MessageAttachment::class)->orderBy('position');
+        return $this->hasMany(MessageAttachment::class, 'message_id')->orderBy('position');
     }
 
     protected $casts = [

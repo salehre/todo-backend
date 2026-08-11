@@ -6,20 +6,22 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('steps', function (Blueprint $table) {
+        Schema::create('feedback_messages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('task_id')->constrained()->cascadeOnDelete();
-            $table->string('text');
-            $table->boolean('completed')->default(false);
-            $table->integer('position')->default(0);
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('name')->nullable();
+            $table->text('message');
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('steps');
+        Schema::dropIfExists('feedback_messages');
     }
 };

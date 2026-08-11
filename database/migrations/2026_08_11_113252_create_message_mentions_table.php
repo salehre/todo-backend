@@ -6,19 +6,15 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('message_mentions', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('message_id')
-                ->constrained('group_messages')
-                ->cascadeOnDelete();
-
-            $table->foreignId('user_id')
-                ->constrained('users')
-                ->cascadeOnDelete();
-
+            $table->foreignId('message_id')->constrained('group_messages')->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->timestamp('created_at')->nullable();
         });
     }
