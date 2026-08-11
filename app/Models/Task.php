@@ -15,6 +15,8 @@ class Task extends Model
         'description',
         'priority',
         'is_completed',
+        'group_id',
+        'assigned_to',
     ];
 
     protected $casts = [
@@ -24,6 +26,16 @@ class Task extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function group()
+    {
+        return $this->belongsTo(Group::class);
+    }
+
+    public function assignee()
+    {
+            return $this->belongsTo(User::class, 'assigned_to');
     }
 
     public function steps()

@@ -8,18 +8,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('group_members', function (Blueprint $table) {
+        Schema::create('message_mentions', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('group_id')
-                ->constrained('groups')
-                ->onDelete('cascade');
+            $table->foreignId('message_id')
+                ->constrained('group_messages')
+                ->cascadeOnDelete();
 
             $table->foreignId('user_id')
                 ->constrained('users')
-                ->onDelete('cascade');
-
-            $table->enum('role', ['admin', 'member'])->default('member');
+                ->cascadeOnDelete();
 
             $table->timestamp('created_at')->nullable();
         });
@@ -27,6 +25,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('group_members');
+        Schema::dropIfExists('message_mentions');
     }
 };

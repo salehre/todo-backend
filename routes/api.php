@@ -5,7 +5,10 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\GroupMessageController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
 Route::get('/GInstall', function () {
     Artisan::call('migrate', ['--path' => 'database/migrations']);
@@ -35,12 +38,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/tasks/updateTask', [TaskController::class, 'updateTask']);
     Route::put('/tasks/updateStep', [TaskController::class, 'updateStep']);
     Route::delete('/tasks/delete', [TaskController::class, 'destroy']);
+    Route::get('/groups/{group}/tasks', [TaskController::class, 'groupTasks']);
+    Route::post('/groups/{group}/tasks', [TaskController::class, 'storeGroupTask']);
     Route::get('/groups', [GroupController::class, 'index']);
     Route::post('/groups', [GroupController::class, 'store']);
+    Route::get('/groups/{group}', [GroupController::class, 'show']);
+    Route::put('/groups/{group}', [GroupController::class, 'update']);
+    Route::delete('/groups/{group}', [GroupController::class, 'destroy']);
+    Route::post('/groups/{group}/avatar', [GroupController::class, 'uploadAvatar']);
+    Route::get('/groups/{group}/members', [GroupController::class, 'members']);
+    Route::post('/groups/{group}/members', [GroupController::class, 'addMember']);
+    Route::delete('/groups/{group}/members/{userId}', [GroupController::class, 'removeMember']);
+    Route::put('/groups/{group}/members/{userId}/role', [GroupController::class, 'updateRole']);
     Route::get('/groups/{group}/messages', [GroupMessageController::class, 'index']);
     Route::post('/groups/{group}/messages', [GroupMessageController::class, 'store']);
     Route::put('/groups/{group}/messages/{message}', [GroupMessageController::class, 'update']);
     Route::delete('/groups/{group}/messages/{message}', [GroupMessageController::class, 'destroy']);
     Route::put('/groups/{group}/messages/{message}/pin', [GroupMessageController::class, 'togglePin']);
+    Route::get('/groups/{group}/pinned-messages', [GroupMessageController::class, 'pinnedMessages']);
     Route::post('/groups/{group}/messages/{message}/react', [GroupMessageController::class, 'react']);
+    Route::post('/groups/{group}/typing', [GroupMessageController::class, 'typing']);
+    Route::put('/groups/{group}/read', [GroupMessageController::class, 'markRead']);
+    Route::get('/users/search', [UserController::class, 'search']);
+    Route::get('/users/{id}/profile', [UserController::class, 'showProfile']);
 });

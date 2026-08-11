@@ -6,27 +6,31 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+
     public function up(): void
     {
-        Schema::create('group_members', function (Blueprint $table) {
+        Schema::create('pinned_messages', function (Blueprint $table) {
             $table->id();
 
             $table->foreignId('group_id')
                 ->constrained('groups')
-                ->onDelete('cascade');
+                ->cascadeOnDelete();
 
-            $table->foreignId('user_id')
-                ->constrained('users')
-                ->onDelete('cascade');
+            $table->foreignId('message_id')
+                ->constrained('group_messages')
+                ->cascadeOnDelete();
 
-            $table->enum('role', ['admin', 'member'])->default('member');
+            $table->foreignId('pinned_by')
+                ->constrained('users');
 
             $table->timestamp('created_at')->nullable();
+
+            $table->unique(['group_id', 'message_id']);
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('group_members');
+        Schema::dropIfExists('pinned_messages');
     }
 };

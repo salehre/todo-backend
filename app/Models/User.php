@@ -23,6 +23,7 @@ use Illuminate\Notifications\Notifiable;
     'email_verified_at',
     'preferences',
     'gender'
+    'bio',
 ])]
 
 #[Hidden([

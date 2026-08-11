@@ -9,14 +9,22 @@ class GroupMessage extends Model
 {
     protected $fillable = [
         'group_id', 'sender_id', 'text', 'type', 'reply_to', 'task_id',
-        'pinned', 'edited', 'attachment_type', 'attachment_path',
-        'attachment_name', 'attachment_size', 'voice_duration',
+        'edited',
     ];
 
+    public function attachments()
+    {
+        return $this->hasMany(MessageAttachment::class)->orderBy('position');
+    }
+
     protected $casts = [
-        'pinned' => 'boolean',
         'edited' => 'boolean',
     ];
+
+    public function mentions()
+    {
+        return $this->hasMany(MessageMention::class, 'message_id');
+    }
 
     public function sender()
     {

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Group extends Model
 {
-    protected $fillable = ['name', 'created_by'];
+    protected $fillable = ['name', 'description', 'avatar', 'created_by'];
 
     public function members()
     {
@@ -22,5 +22,10 @@ class Group extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function memberships()
+    {
+        return $this->hasMany(GroupMember::class);
     }
 }

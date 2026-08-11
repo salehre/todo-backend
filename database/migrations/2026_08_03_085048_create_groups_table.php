@@ -11,10 +11,12 @@ return new class extends Migration
         Schema::create('groups', function (Blueprint $table) {
             $table->id();
             $table->string('name', 255);
+            $table->text('description')->nullable();
+            $table->string('avatar', 255)->nullable();
             $table->foreignId('created_by')
                 ->constrained('users')
-                ->onDelete('cascade'); // در صورت نیاز می‌تونی onDelete رو حذف یا تغییر بدی
-            $table->timestamps(); // created_at و updated_at (Null: Yes)
+                ->onDelete('cascade');
+            $table->timestamps();
         });
     }
 

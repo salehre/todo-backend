@@ -212,7 +212,7 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email,' . $user->id,
             'phone' => 'nullable|string|max:20|regex:/^09\d{9}$/',
             'gender' => 'nullable|in:male,female,company',
-
+            'bio' => 'nullable|string|max:280',
         ]);
 
         $user->update($data);
@@ -264,6 +264,7 @@ class AuthController extends Controller
     {
         $prefs = $user->preferences ?? [];
         return [
+            'id' => $user->id,
             'name' => $user->name,
             'username' => $user->username,
             'email' => $user->email,
@@ -274,6 +275,7 @@ class AuthController extends Controller
             'avatar_url' => $user->avatar ? asset('storage/' . $user->avatar) : null,
             'cover_url' => $user->cover ? asset('storage/' . $user->cover) : null,
             'gender' => $user->gender,
+            'bio' => $user->bio,
         ];
     }
 }
