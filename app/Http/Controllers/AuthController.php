@@ -213,6 +213,9 @@ class AuthController extends Controller
             'phone' => 'nullable|string|max:20|regex:/^09\d{9}$/',
             'gender' => 'nullable|in:male,female,company',
             'bio' => 'nullable|string|max:280',
+            'social_links' => 'nullable|array|max:3',
+            'social_links.*.platform' => 'required_with:social_links|string|max:30',
+            'social_links.*.url' => 'required_with:social_links|url|max:255',
         ]);
 
         $user->update($data);
@@ -276,6 +279,7 @@ class AuthController extends Controller
             'cover_url' => $user->cover ? asset('storage/' . $user->cover) : null,
             'gender' => $user->gender,
             'bio' => $user->bio,
+            'social_links' => $user->social_links ?? [],
         ];
     }
 }

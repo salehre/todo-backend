@@ -24,6 +24,7 @@ use Illuminate\Notifications\Notifiable;
     'preferences',
     'gender',
     'bio',
+    'social_links',
 ])]
 
 #[Hidden([
@@ -32,14 +33,8 @@ use Illuminate\Notifications\Notifiable;
 ])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -47,6 +42,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'verification_code_expires_at' => 'datetime',
             'preferences' => 'array',
+            'social_links' => 'array',
         ];
     }
 

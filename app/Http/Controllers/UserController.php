@@ -43,6 +43,7 @@ class UserController extends Controller
             'avatarUrl' => $user->avatar ? asset('storage/' . $user->avatar) : null,
             'coverUrl' => $user->cover ? asset('storage/' . $user->cover) : null,
             'bio' => $user->bio,
+            'social_links' => $user->social_links ?? [],
         ]);
     }
 }

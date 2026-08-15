@@ -138,21 +138,6 @@ class GroupController extends Controller
         return response()->json($members);
     }
 
-    // POST /groups/{group}/members — فقط مدیر، افزودن عضو
-    public function addMember(Request $request, Group $group)
-    {
-        $this->requireAdmin($request, $group);
-
-        $data = $request->validate(['user_id' => 'required|integer|exists:users,id']);
-
-        GroupMember::firstOrCreate(
-            ['group_id' => $group->id, 'user_id' => $data['user_id']],
-            ['role' => 'member']
-        );
-
-        return response()->json(['success' => true]);
-    }
-
     // DELETE /groups/{group}/members/{userId} — مدیر می‌تونه هرکسی رو حذف کنه؛ خودِ فرد هم می‌تونه خودش رو حذف کنه (leave)
     public function removeMember(Request $request, Group $group, int $userId)
     {

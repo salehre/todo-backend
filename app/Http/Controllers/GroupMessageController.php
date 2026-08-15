@@ -81,6 +81,13 @@ class GroupMessageController extends Controller
             }}
        $message->load(['reactions', 'task', 'attachments']);
 
+        $otherMemberIds = \App\Models\GroupMember::where('group_id', $group->id)
+            ->where('user_id', '!=', $request->user()->id)
+            ->pluck('user_id');
+        foreach ($otherMemberIds as $memberId) {
+            event(new \App\Events\MessageNotification($memberId, $group->id, $group->name));
+        }
+
         if (!empty($data['mentions'])) {
             $validMentions = $group->members()->whereIn('users.id', $data['mentions'])->pluck('users.id');
             foreach ($validMentions as $userId) {
