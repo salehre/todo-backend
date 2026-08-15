@@ -7,6 +7,7 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\GroupMessageController;
 use App\Http\Controllers\GroupInviteController;
 use App\Http\Controllers\UserController;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
@@ -25,6 +26,7 @@ Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
 Route::post('/auth/set-password', [AuthController::class, 'setPassword']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/auth/verify-reset-code', [AuthController::class, 'verifyResetCode']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

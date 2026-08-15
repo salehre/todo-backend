@@ -262,6 +262,19 @@ class AuthController extends Controller
         return response()->json(['success' => true, 'user' => $this->userPayload($user)]);
     }
 
+    // POST /auth/verify-reset-code
+    public function verifyResetCode(Request $request)
+    {
+        $data = $request->validate(['email' => 'required|email', 'code' => 'required|string']);
+        $user = User::where('email', $data['email'])->first();
+
+        if (! $user || ! $this->codeIsValid($user, $data['code'])) {
+            return response()->json(['success' => false], 422);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     // ─── هلپر داخلی: ساخت آرایه‌ی یکسان یوزر برای همه‌ی جواب‌ها ──────────
     private function userPayload(User $user): array
     {
