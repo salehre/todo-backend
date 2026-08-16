@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Events\InviteSent;
+use App\Events\MessageSent;
+use App\Models\GroupMessage;
 use App\Models\Group;
 use App\Models\GroupInvite;
 use App\Models\GroupMember;
@@ -73,7 +75,36 @@ class GroupInviteController extends Controller
         );
         $invite->update(['status' => 'accepted']);
 
+        $message = GroupMessage::create([
+            'group_id' => $invite->group_id,
+            'sender_id' => $invite->user_id,
+            'text' => "{$request->user()->name} به گروه اضافه شد",
+            'type' => 'system',
+        ])->load(['reactions', 'task', 'attachments']);
+
+        event(new MessageSent($invite->group_id, $this->formatMessageForNotice($message)));
+
+
         return response()->json(['success' => true, 'groupId' => $invite->group_id]);
+    }
+
+    private function formatMessageForNotice(GroupMessage $m): array
+    {
+        return [
+            'id' => $m->id,
+            'senderId' => $m->sender_id,
+            'text' => $m->text,
+            'timestamp' => $m->created_at,
+            'type' => $m->type,
+            'pinned' => false,
+            'edited' => false,
+            'replyTo' => null,
+            'reactions' => (object) [],
+            'readBy' => [],
+            'mentions' => [],
+            'todoRef' => null,
+            'attachments' => [],
+        ];
     }
 
     // PUT /invites/{invite}/decline

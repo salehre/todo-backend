@@ -23,13 +23,21 @@ class GroupController extends Controller
     // GET /groups
     public function index(Request $request)
     {
-        $groups = $request->user()->groups()->withCount('members')->get()->map(fn ($g) => [
-            'id' => $g->id,
-            'name' => $g->name,
-            'description' => $g->description,
-            'avatar_url' => $g->avatar ? asset('storage/' . $g->avatar) : null,
-            'members_count' => $g->members_count,
-        ]);
+        $groups = $request->user()->groups()
+                ->withCount('members')
+                ->with(['messages' => fn ($q) => $q->latest()->limit(1)])
+                ->get()
+                ->sortByDesc(fn ($g) => optional($g->messages->first())->created_at ?? $g->created_at)
+                ->values()
+                ->map(fn ($g) => [
+                    'id' => $g->id,
+                    'name' => $g->name,
+                    'description' => $g->description,
+                    'avatar_url' => $g->avatar ? asset('storage/' . $g->avatar) : null,
+                    'members_count' => $g->members_count,
+                    'last_message_at' => optional($g->messages->first())->created_at,
+                    'created_at' => $g->created_at,
+                   ]);
         return response()->json($groups);
     }
 
@@ -101,20 +109,22 @@ class GroupController extends Controller
         return response()->json(['success' => true, 'avatar_url' => asset('storage/' . $path)]);
     }
 
-    // DELETE /groups/{group} — فقط مدیر
     public function destroy(Request $request, Group $group)
     {
         $this->requireAdmin($request, $group);
 
-        // پاک کردن فایل‌های ضمیمه‌ی پیام‌ها قبل از حذف رکوردها
-        foreach ($group->messages()->whereNotNull('attachment_path')->get() as $msg) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($msg->attachment_path);
+        $attachmentPaths = \App\Models\MessageAttachment::whereIn(
+            'message_id',
+            $group->messages()->pluck('id')
+        )->pluck('path');
+        foreach ($attachmentPaths as $path) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
         }
         if ($group->avatar) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($group->avatar);
         }
 
-        $group->delete(); // بقیه (اعضا، پیام‌ها، ری‌اکشن‌ها، پین‌ها، منشن‌ها) با CASCADE خودکار پاک می‌شن
+        $group->delete();
 
         return response()->json(['success' => true]);
     }
@@ -138,7 +148,6 @@ class GroupController extends Controller
         return response()->json($members);
     }
 
-    // DELETE /groups/{group}/members/{userId} — مدیر می‌تونه هرکسی رو حذف کنه؛ خودِ فرد هم می‌تونه خودش رو حذف کنه (leave)
     public function removeMember(Request $request, Group $group, int $userId)
     {
         $requester = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
