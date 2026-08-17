@@ -12,21 +12,28 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
-Route::get('/GInstall', function () {
+Route::get('/GInstall', function (\Illuminate\Http\Request $request) {
+    abort_unless(
+        $request->query('secret') && hash_equals((string) env('DEPLOY_SECRET', ''), (string) $request->query('secret')),
+        403
+    );
     Artisan::call('migrate', ['--path' => 'database/migrations']);
     echo "Migrated todolist<br>";
+});;
+
+Route::middleware('throttle:6,1')->group(function () {
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/resend-code', [AuthController::class, 'resendCode']);
+    Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/auth/verify-reset-code', [AuthController::class, 'verifyResetCode']);
 });
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/auth/userInfo', [AuthController::class, 'userInfo']);
 Route::post('/auth/register', [AuthController::class, 'register']);
-Route::post('/auth/resend-code', [AuthController::class, 'resendCode']);
-Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
 Route::post('/auth/set-password', [AuthController::class, 'setPassword']);
-Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
-Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
-Route::post('/auth/verify-reset-code', [AuthController::class, 'verifyResetCode']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

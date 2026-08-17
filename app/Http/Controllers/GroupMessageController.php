@@ -30,6 +30,11 @@ class GroupMessageController extends Controller
         return $member;
     }
 
+    private function messageInGroup(Group $group, GroupMessage $message): void
+    {
+        abort_unless($message->group_id === $group->id, 404);
+    }
+
     // GET /groups/{group}/messages
     public function index(Request $request, Group $group)
     {
@@ -59,6 +64,14 @@ class GroupMessageController extends Controller
             'mentions' => 'nullable|array',
             'mentions.*' => 'integer|exists:users,id',
         ]);
+
+        if (!empty($data['task_id'])) {
+            abort_unless(
+                \App\Models\Task::where('id', $data['task_id'])->where('group_id', $group->id)->exists(),
+                422,
+                'این تسک متعلق به این گروه نیست'
+            );
+        }
 
         $message = GroupMessage::create([
             'group_id' => $group->id,
@@ -108,7 +121,8 @@ class GroupMessageController extends Controller
     {
         $this->member($request, $group);
         abort_unless($message->sender_id === $request->user()->id, 403);
-
+        abort_unless($message->group_id === $group->id, 404);
+        $this->messageInGroup($group, $message);
         $data = $request->validate(['text' => 'required|string|max:5000']);
         $message->update(['text' => $data['text'], 'edited' => true]);
 
@@ -123,7 +137,7 @@ class GroupMessageController extends Controller
     {
         $this->member($request, $group);
         abort_unless($message->sender_id === $request->user()->id, 403);
-
+        $this->messageInGroup($group, $message);
         $messageId = $message->id;
         $message->delete();
 
@@ -136,6 +150,7 @@ class GroupMessageController extends Controller
     public function togglePin(Request $request, Group $group, GroupMessage $message)
     {
         $this->member($request, $group);
+        $this->messageInGroup($group, $message);
         $existing = PinnedMessage::where('group_id', $group->id)->where('message_id', $message->id)->first();
 
         if ($existing) {
@@ -172,6 +187,7 @@ class GroupMessageController extends Controller
     public function react(Request $request, Group $group, GroupMessage $message)
     {
         $this->member($request, $group);
+        $this->messageInGroup($group, $message);
         $data = $request->validate(['emoji' => 'required|string|max:10']);
         $userId = $request->user()->id;
 

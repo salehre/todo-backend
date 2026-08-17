@@ -76,9 +76,11 @@ class AuthController extends Controller
     public function resendCode(Request $request)
     {
         $data = $request->validate(['email' => 'required|email']);
-        $user = User::where('email', $data['email'])->firstOrFail();
+        $user = User::where('email', $data['email'])->first();
 
-        $this->issueCode($user);
+        if ($user) {
+            $this->issueCode($user);
+        }
 
         return response()->json(['success' => true]);
     }
@@ -133,9 +135,11 @@ class AuthController extends Controller
     public function forgotPassword(Request $request)
     {
         $data = $request->validate(['email' => 'required|email']);
-        $user = User::where('email', $data['email'])->firstOrFail();
+        $user = User::where('email', $data['email'])->first();
 
-        $this->issueCode($user);
+        if ($user) {
+            $this->issueCode($user);
+        }
 
         return response()->json(['success' => true]);
     }
