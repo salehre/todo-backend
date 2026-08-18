@@ -16,7 +16,6 @@ class Task extends Model
         'priority',
         'is_completed',
         'group_id',
-        'assigned_to',
     ];
 
     protected $casts = [
@@ -33,9 +32,9 @@ class Task extends Model
         return $this->belongsTo(Group::class);
     }
 
-    public function assignee()
+    public function assignees()
     {
-            return $this->belongsTo(User::class, 'assigned_to');
+        return $this->belongsToMany(User::class, 'task_assignees');
     }
 
     public function steps()

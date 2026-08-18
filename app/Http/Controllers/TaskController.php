@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use App\Models\GroupMember;
+use App\Models\Group;
 use Illuminate\Http\Request;
+use App\Events\MessageSent;
+use App\Models\GroupMessage;
 
 class TaskController extends Controller
 {
-    // GET /tasks — تسک‌های شخصی + تسک‌های گروهی که به خودِ کاربر اساین شده
+    // GET /tasks — تسک‌های شخصی  تسک‌های گروهی که خودم جزو assignee هاشونم
     public function index(Request $request)
     {
         $userId = $request->user()->id;
@@ -17,29 +20,30 @@ class TaskController extends Controller
             $q->where('user_id', $userId)->whereNull('group_id');
         })
             ->orWhere(function ($q) use ($userId) {
-                $q->where('assigned_to', $userId)->whereNotNull('group_id');
+                $q->whereNotNull('group_id')
+                    ->whereHas('assignees', fn ($aq) => $aq->where('users.id', $userId));
             })
-            ->with(['steps', 'group:id,name'])
+            ->with(['steps', 'group:id,name', 'assignees:id,name,username,avatar'])
             ->orderByDesc('id')
             ->get();
 
-        return response()->json($tasks->map(fn ($t) => $this->formatTask($t)));
+        return response()->json($tasks->map(fn ($t) => $this->formatTask($t, $userId)));
     }
 
-    // GET /groups/{group}/tasks — همه‌ی تسک‌های گروه (برای همه‌ی اعضا قابل دیدنه)
-    public function groupTasks(Request $request, \App\Models\Group $group)
+    // GET /groups/{group}/tasks
+    public function groupTasks(Request $request, Group $group)
     {
         $this->requireMember($request, $group->id);
 
         $tasks = Task::where('group_id', $group->id)
-            ->with(['steps', 'assignee:id,name,username'])
+            ->with(['steps', 'assignees:id,name,username,avatar'])
             ->orderByDesc('id')
             ->get();
 
-        return response()->json($tasks->map(fn ($t) => $this->formatTask($t)));
+        return response()->json($tasks->map(fn ($t) => $this->formatTask($t, $request->user()->id)));
     }
 
-    // POST /tasks/create — ساخت تسک شخصی (بدون تغییر نسبت به قبل)
+    // POST /tasks/create — تسک شخصی
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -50,19 +54,19 @@ class TaskController extends Controller
 
         $task = Task::create([
             'user_id' => $request->user()->id,
-            'assigned_to' => $request->user()->id,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'priority' => $data['priority'],
             'is_completed' => false,
         ]);
+        $task->assignees()->attach($request->user()->id);
 
-        $task->load('steps');
-        return response()->json($this->formatTask($task));
+        $task->load(['steps', 'assignees:id,name,username,avatar']);
+        return response()->json($this->formatTask($task, $request->user()->id));
     }
 
-    // POST /groups/{group}/tasks — ساخت تسک برای یه عضو گروه
-    public function storeGroupTask(Request $request, \App\Models\Group $group)
+    // POST /groups/{group}/tasks — تسک گروهی، با چندین assignee
+    public function storeGroupTask(Request $request, Group $group)
     {
         $this->requireMember($request, $group->id);
 
@@ -70,28 +74,58 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'required|in:low,medium,high',
-            'assigned_to' => 'required|integer|exists:users,id',
+            'assigned_to' => 'required|array|min:1',
+            'assigned_to.*' => 'integer',
         ]);
 
-        // مطمئن شو کسی که داره بهش assign می‌شه، خودش عضو همین گروهه
-        abort_unless(
-            GroupMember::where('group_id', $group->id)->where('user_id', $data['assigned_to'])->exists(),
-            422,
-            'کاربر انتخاب‌شده عضو این گروه نیست'
-        );
+        // فقط کسایی که واقعاً عضو همین گروه‌ان قابل انتخاب‌ان
+        $validAssignees = GroupMember::where('group_id', $group->id)
+            ->whereIn('user_id', $data['assigned_to'])
+            ->pluck('user_id');
+
+        abort_if($validAssignees->isEmpty(), 422, 'حداقل باید یک عضو معتبر انتخاب بشه');
 
         $task = Task::create([
-            'user_id' => $request->user()->id, // سازنده
+            'user_id' => $request->user()->id,
             'group_id' => $group->id,
-            'assigned_to' => $data['assigned_to'],
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'priority' => $data['priority'],
             'is_completed' => false,
         ]);
+        $task->assignees()->attach($validAssignees);
 
-        $task->load(['steps', 'assignee:id,name,username', 'group:id,name']);
-        return response()->json($this->formatTask($task));
+        $task->load(['steps', 'assignees:id,name,username,avatar', 'group:id,name']);
+
+        $assigneeNames = $task->assignees->pluck('name')->implode('، ');
+        $text = "{$request->user()->name} تسک «{$task->title}» رو برای {$assigneeNames} ساخت";
+        $message = GroupMessage::create([
+            'group_id' => $group->id,
+            'sender_id' => $request->user()->id,
+            'text' => $text,
+            'type' => 'system',
+        ])->load(['reactions', 'task', 'attachments']);
+        event(new MessageSent($group->id, $this->formatMessageForNotice($message)));
+        return response()->json($this->formatTask($task, $request->user()->id));
+    }
+
+    private function formatMessageForNotice(GroupMessage $m): array
+    {
+        return [
+            'id' => $m->id,
+            'senderId' => $m->sender_id,
+            'text' => $m->text,
+            'timestamp' => $m->created_at,
+            'type' => $m->type,
+            'pinned' => false,
+            'edited' => false,
+            'replyTo' => null,
+            'reactions' => (object) [],
+            'readBy' => [],
+            'mentions' => [],
+            'todoRef' => null,
+            'attachments' => [],
+        ];
     }
 
     // PUT /tasks/updateTask
@@ -105,29 +139,27 @@ class TaskController extends Controller
             'is_completed' => 'sometimes|boolean',
         ]);
 
-        $task = Task::findOrFail($data['id']);
+        $task = Task::with('assignees')->findOrFail($data['id']);
         $userId = $request->user()->id;
+        $assigneeIds = $task->assignees->pluck('id');
 
         if ($task->group_id) {
-            // تسک گروهیه: فقط سازنده یا assignee اجازه‌ی ویرایش عنوان/توضیح/اولویت دارن
-            abort_unless(in_array($userId, [$task->user_id, $task->assigned_to]), 403);
+            abort_unless($userId === $task->user_id || $assigneeIds->contains($userId), 403);
 
-            // ولی تیک‌زدنِ "تمام‌شده" فقط دست خودِ assignee‌ست
-            if (array_key_exists('is_completed', $data) && $userId !== $task->assigned_to) {
+            if (array_key_exists('is_completed', $data) && ! $assigneeIds->contains($userId)) {
                 abort(403, 'فقط کسی که این تسک بهش محول شده می‌تونه تکمیلش کنه');
             }
         } else {
-            // تسک شخصیه: فقط صاحبش
             abort_unless($task->user_id === $userId, 403);
         }
 
         $task->update(collect($data)->except('id')->toArray());
-        $task->load(['steps', 'group:id,name']);
+        $task->load(['steps', 'group:id,name', 'assignees:id,name,username,avatar']);
 
-        return response()->json($this->formatTask($task));
+        return response()->json($this->formatTask($task, $userId));
     }
 
-    // PUT /tasks/updateStep — فقط assignee (یا صاحب تسک شخصی) اجازه داره استپ‌ها رو مدیریت کنه
+    // PUT /tasks/updateStep — هر assignee‌ای (نه فقط یه نفر) اجازه داره استپ‌ها رو مدیریت کنه
     public function updateStep(Request $request)
     {
         $data = $request->validate([
@@ -138,11 +170,13 @@ class TaskController extends Controller
             'steps.*.completed' => 'required|boolean',
         ]);
 
-        $task = Task::findOrFail($data['task_id']);
+        $task = Task::with('assignees')->findOrFail($data['task_id']);
         $userId = $request->user()->id;
-        $allowedUser = $task->group_id ? $task->assigned_to : $task->user_id;
+        $allowed = $task->group_id
+            ? $task->assignees->pluck('id')->contains($userId)
+            : $task->user_id === $userId;
 
-        abort_unless($userId === $allowedUser, 403, 'فقط کسی که این تسک بهش محول شده می‌تونه استپ‌هاش رو تغییر بده');
+        abort_unless($allowed, 403, 'فقط کسی که این تسک بهش محول شده می‌تونه استپ‌هاش رو تغییر بده');
 
         $incomingIds = collect($data['steps'])->pluck('id')->filter()->all();
         $task->steps()->whereNotIn('id', $incomingIds)->delete();
@@ -157,7 +191,7 @@ class TaskController extends Controller
         return response()->json($task->steps()->orderBy('position')->get());
     }
 
-    // DELETE /tasks/delete — فقط سازنده
+    // DELETE /tasks/delete
     public function destroy(Request $request)
     {
         $data = $request->validate(['id' => 'required|integer']);
@@ -177,7 +211,7 @@ class TaskController extends Controller
         );
     }
 
-    private function formatTask(Task $task): array
+    private function formatTask(Task $task, int $currentUserId): array
     {
         return [
             'id' => $task->id,
@@ -189,11 +223,15 @@ class TaskController extends Controller
             'steps' => $task->steps,
             'group_id' => $task->group_id,
             'group_name' => $task->group?->name,
-            'assigned_to' => $task->assigned_to,
-            'assignee_name' => $task->assignee?->name,
+            'assignees' => $task->assignees->map(fn ($u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'username' => $u->username,
+                'avatarUrl' => $u->avatar ? asset('storage/' . $u->avatar) : null,
+            ]),
             'can_complete' => $task->group_id
-                ? $task->assigned_to === auth()->id()
-                : $task->user_id === auth()->id(),
+                ? $task->assignees->pluck('id')->contains($currentUserId)
+                : $task->user_id === $currentUserId,
         ];
     }
 }
