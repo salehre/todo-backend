@@ -22,7 +22,6 @@ Route::get('/GInstall', function (\Illuminate\Http\Request $request) {
 });;
 
 Route::middleware('throttle:6,1')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
     Route::post('/auth/login', [AuthController::class, 'login']);
     Route::post('/auth/resend-code', [AuthController::class, 'resendCode']);
     Route::post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
@@ -36,7 +35,6 @@ Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/set-password', [AuthController::class, 'setPassword']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
     Route::put('/auth/preferences', [AuthController::class, 'updatePreferences']);
     Route::post('/feedback', [FeedbackController::class, 'store']);
     Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
