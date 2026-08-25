@@ -7,6 +7,7 @@ use App\Models\GroupMember;
 use Illuminate\Http\Request;
 use App\Events\MessageSent;
 use App\Models\GroupMessage;
+use App\Events\RemovedFromGroup;
 
 class GroupController extends Controller
 {
@@ -26,13 +27,13 @@ class GroupController extends Controller
     public function index(Request $request)
     {
         $groups = $request->user()->groups()
-                ->withCount('members')
-                ->with(['messages' => fn ($q) => $q->latest()->limit(1)->with('attachments')])
-                ->get()
-                ->sortByDesc(fn ($g) => optional($g->messages->first())->created_at ?? $g->created_at)
-                ->values()
+            ->withCount('members')
+            ->with(['latestMessage.attachments'])
+            ->get()
+            ->sortByDesc(fn ($g) => optional($g->latestMessage)->created_at ?? $g->created_at)
+            ->values()
             ->map(function ($g) {
-                $last = $g->messages->first();
+                $last = $g->latestMessage;
                 $preview = null;
                 if ($last) {
                     $preview = $last->text ?: ($last->attachments->isNotEmpty()
@@ -182,6 +183,10 @@ class GroupController extends Controller
                 'type' => 'system',
             ])->load(['reactions', 'task', 'attachments']);
             event(new MessageSent($group->id, $this->formatMessageForNotice($message)));
+
+            if (!$isLeaving) {
+                event(new RemovedFromGroup($userId, $group->name));
+            }
         }
 
 

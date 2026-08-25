@@ -19,6 +19,11 @@ class Group extends Model
         return $this->hasMany(GroupMessage::class)->orderBy('created_at');
     }
 
+    public function latestMessage()
+    {
+        return $this->hasOne(GroupMessage::class)->latestOfMany();
+    }
+
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
