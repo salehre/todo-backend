@@ -11,7 +11,6 @@ use App\Models\GroupMessage;
 
 class TaskController extends Controller
 {
-    // GET /tasks — تسک‌های شخصی  تسک‌های گروهی که خودم جزو assignee هاشونم
     public function index(Request $request)
     {
         $userId = $request->user()->id;
@@ -30,7 +29,6 @@ class TaskController extends Controller
         return response()->json($tasks->map(fn ($t) => $this->formatTask($t, $userId)));
     }
 
-    // GET /groups/{group}/tasks
     public function groupTasks(Request $request, Group $group)
     {
         $this->requireMember($request, $group->id);
@@ -43,7 +41,6 @@ class TaskController extends Controller
         return response()->json($tasks->map(fn ($t) => $this->formatTask($t, $request->user()->id)));
     }
 
-    // POST /tasks/create — تسک شخصی
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -58,6 +55,7 @@ class TaskController extends Controller
             'description' => $data['description'] ?? null,
             'priority' => $data['priority'],
             'is_completed' => false,
+            'ordered_steps' => $data['ordered_steps'] ?? true,
         ]);
         $task->assignees()->attach($request->user()->id);
 
@@ -65,7 +63,6 @@ class TaskController extends Controller
         return response()->json($this->formatTask($task, $request->user()->id));
     }
 
-    // POST /groups/{group}/tasks — تسک گروهی، با چندین assignee
     public function storeGroupTask(Request $request, Group $group)
     {
         $this->requireMember($request, $group->id);
@@ -74,11 +71,11 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'required|in:low,medium,high',
+            'ordered_steps' => 'sometimes|boolean',
             'assigned_to' => 'required|array|min:1',
             'assigned_to.*' => 'integer',
         ]);
 
-        // فقط کسایی که واقعاً عضو همین گروه‌ان قابل انتخاب‌ان
         $validAssignees = GroupMember::where('group_id', $group->id)
             ->whereIn('user_id', $data['assigned_to'])
             ->pluck('user_id');
@@ -137,6 +134,7 @@ class TaskController extends Controller
             'description' => 'sometimes|nullable|string',
             'priority' => 'sometimes|in:low,medium,high',
             'is_completed' => 'sometimes|boolean',
+            'ordered_steps' => 'sometimes|boolean',
         ]);
 
         $task = Task::with('assignees')->findOrFail($data['id']);
@@ -159,7 +157,6 @@ class TaskController extends Controller
         return response()->json($this->formatTask($task, $userId));
     }
 
-    // PUT /tasks/updateStep — هر assignee‌ای (نه فقط یه نفر) اجازه داره استپ‌ها رو مدیریت کنه
     public function updateStep(Request $request)
     {
         $data = $request->validate([
@@ -191,7 +188,6 @@ class TaskController extends Controller
         return response()->json($task->steps()->orderBy('position')->get());
     }
 
-    // DELETE /tasks/delete
     public function destroy(Request $request)
     {
         $data = $request->validate(['id' => 'required|integer']);
@@ -221,6 +217,7 @@ class TaskController extends Controller
             'is_completed' => $task->is_completed,
             'created_at' => $task->created_at,
             'steps' => $task->steps,
+            'ordered_steps' => $task->ordered_steps,
             'group_id' => $task->group_id,
             'group_name' => $task->group?->name,
             'assignees' => $task->assignees->map(fn ($u) => [
