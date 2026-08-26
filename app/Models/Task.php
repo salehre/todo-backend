@@ -16,10 +16,12 @@ class Task extends Model
         'priority',
         'is_completed',
         'group_id',
+        'ordered_steps',
     ];
 
     protected $casts = [
         'is_completed' => 'boolean',
+        'ordered_steps' => 'boolean',
     ];
 
     public function user()
