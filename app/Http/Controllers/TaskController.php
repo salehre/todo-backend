@@ -47,6 +47,11 @@ class TaskController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'priority' => 'required|in:low,medium,high',
+        ], [
+            'title.required' => 'عنوان تسک نمی‌تونه خالی باشه',
+            'title.max' => 'عنوان تسک نمی‌تونه بیشتر از ۲۵۵ کاراکتر باشه',
+            'priority.required' => 'اولویت رو انتخاب کن',
+            'priority.in' => 'اولویت باید یکی از low، medium یا high باشه',
         ]);
 
         $task = Task::create([
@@ -74,6 +79,13 @@ class TaskController extends Controller
             'ordered_steps' => 'sometimes|boolean',
             'assigned_to' => 'required|array|min:1',
             'assigned_to.*' => 'integer',
+        ], [
+            'title.required' => 'عنوان تسک نمی‌تونه خالی باشه',
+            'title.max' => 'عنوان تسک نمی‌تونه بیشتر از ۲۵۵ کاراکتر باشه',
+            'priority.required' => 'اولویت رو انتخاب کن',
+            'priority.in' => 'اولویت باید یکی از low، medium یا high باشه',
+            'assigned_to.required' => 'حداقل باید یک نفر رو به تسک اختصاص بدی',
+            'assigned_to.min' => 'حداقل باید یک نفر رو به تسک اختصاص بدی',
         ]);
 
         $validAssignees = GroupMember::where('group_id', $group->id)
@@ -135,6 +147,9 @@ class TaskController extends Controller
             'priority' => 'sometimes|in:low,medium,high',
             'is_completed' => 'sometimes|boolean',
             'ordered_steps' => 'sometimes|boolean',
+        ], [
+            'title.max' => 'عنوان تسک نمی‌تونه بیشتر از ۲۵۵ کاراکتر باشه',
+            'priority.in' => 'اولویت باید یکی از low، medium یا high باشه',
         ]);
 
         $task = Task::with('assignees')->findOrFail($data['id']);

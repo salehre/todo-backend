@@ -5,18 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Group;
 use App\Models\GroupMember;
 use Illuminate\Http\Request;
+use App\Events\MessageSent;
+use App\Models\GroupMessage;
+use App\Events\RemovedFromGroup;
 
 class GroupController extends Controller
 {
     private function requireAdmin(Request $request, Group $group): GroupMember
     {
-        $member = GroupMember::where('group_id', $group->id)
-            ->where('user_id', $request->user()->id)
-            ->first();
-
+        $member = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
         abort_unless($member, 403);
-        abort_unless($member->role === 'admin', 403, 'فقط مدیر گروه اجازه‌ی این کار رو داره');
-
+        abort_unless(in_array($member->role, ['admin', 'owner']), 403, 'فقط مدیر گروه اجازه‌ی این کار رو داره');
         return $member;
     }
 
@@ -24,20 +23,30 @@ class GroupController extends Controller
     public function index(Request $request)
     {
         $groups = $request->user()->groups()
-                ->withCount('members')
-                ->with(['messages' => fn ($q) => $q->latest()->limit(1)])
-                ->get()
-                ->sortByDesc(fn ($g) => optional($g->messages->first())->created_at ?? $g->created_at)
-                ->values()
-                ->map(fn ($g) => [
+            ->withCount('members')
+            ->with(['latestMessage.attachments'])
+            ->get()
+            ->sortByDesc(fn ($g) => optional($g->latestMessage)->created_at ?? $g->created_at)
+            ->values()
+            ->map(function ($g) {
+                $last = $g->latestMessage;
+                $preview = null;
+                if ($last) {
+                    $preview = $last->text ?: ($last->attachments->isNotEmpty()
+                        ? ($last->attachments->first()->type === 'image' ? '📷 Photo' : ($last->attachments->first()->type === 'voice' ? '🎤 Voice message' : '📎 File'))
+                        : null);
+                }
+                return [
                     'id' => $g->id,
                     'name' => $g->name,
                     'description' => $g->description,
                     'avatar_url' => $g->avatar ? asset('storage/' . $g->avatar) : null,
                     'members_count' => $g->members_count,
-                    'last_message_at' => optional($g->messages->first())->created_at,
+                    'last_message_at' => optional($last)->created_at,
+                    'last_message_preview' => $preview,
                     'created_at' => $g->created_at,
-                   ]);
+                ];
+            });
         return response()->json($groups);
     }
 
@@ -72,7 +81,7 @@ class GroupController extends Controller
         GroupMember::create([
             'group_id' => $group->id,
             'user_id' => $request->user()->id,
-            'role' => 'admin',
+            'role' => 'owner',
         ]);
 
         return response()->json($group);
@@ -152,19 +161,73 @@ class GroupController extends Controller
     {
         $requester = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
         abort_unless($requester, 403);
-        abort_unless($requester->role === 'admin' || $requester->user_id === $userId, 403);
+        $target = GroupMember::where('group_id', $group->id)->where('user_id', $userId)->first();
+        $isLeaving = $requester->user_id === $userId;
+        if (!$isLeaving) {
+            abort_unless($requester->isAdmin(), 403);
+            if ($target && in_array($target->role, ['admin', 'owner']) && !$requester->isOwner()) {
+                abort(403, 'فقط مالک گروه می‌تونه یه مدیر رو حذف کنه');
+            }
+            if ($target && $target->role === 'owner') {
+                abort(403, 'نمی‌شه مالک گروه رو حذف کرد');
+            }
+        }
+
+        $removedUser = \App\Models\User::find($userId);
+        $isLeaving = $requester->user_id === $userId;
 
         GroupMember::where('group_id', $group->id)->where('user_id', $userId)->delete();
 
+        if ($removedUser) {
+            $text = $isLeaving
+                ? "{$removedUser->name} گروه رو ترک کرد"
+                : "{$removedUser->name} توسط {$request->user()->name} از گروه حذف شد";
+            $message = GroupMessage::create([
+                'group_id' => $group->id,
+                'sender_id' => $request->user()->id,
+                'text' => $text,
+                'type' => 'system',
+            ])->load(['reactions', 'task', 'attachments']);
+            event(new MessageSent($group->id, $this->formatMessageForNotice($message)));
+
+            if (!$isLeaving) {
+                event(new RemovedFromGroup($userId, $group->name));
+            }
+        }
+
+
         return response()->json(['success' => true]);
+    }
+
+    private function formatMessageForNotice(GroupMessage $m): array
+    {
+        return [
+            'id' => $m->id,
+            'senderId' => $m->sender_id,
+            'text' => $m->text,
+            'timestamp' => $m->created_at,
+            'type' => $m->type,
+            'pinned' => false,
+            'edited' => false,
+            'replyTo' => null,
+            'reactions' => (object) [],
+            'readBy' => [],
+            'mentions' => [],
+            'todoRef' => null,
+            'attachments' => [],
+        ];
     }
 
     // PUT /groups/{group}/members/{userId}/role — فقط مدیر، ارتقا/تنزل نقش
     public function updateRole(Request $request, Group $group, int $userId)
     {
-        $this->requireAdmin($request, $group);
+        $requester = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
+        abort_unless($requester && $requester->isOwner(), 403, 'فقط مالک گروه می‌تونه نقش اعضا رو تغییر بده');
 
         $data = $request->validate(['role' => 'required|in:admin,member']);
+
+        $target = GroupMember::where('group_id', $group->id)->where('user_id', $userId)->first();
+        abort_if($target && $target->role === 'owner', 422, 'نمی‌شه نقش مالک رو تغییر داد');
 
         GroupMember::where('group_id', $group->id)->where('user_id', $userId)
             ->update(['role' => $data['role']]);
