@@ -13,13 +13,9 @@ class GroupController extends Controller
 {
     private function requireAdmin(Request $request, Group $group): GroupMember
     {
-        $member = GroupMember::where('group_id', $group->id)
-            ->where('user_id', $request->user()->id)
-            ->first();
-
+        $member = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
         abort_unless($member, 403);
-        abort_unless($member->role === 'admin', 403, 'فقط مدیر گروه اجازه‌ی این کار رو داره');
-
+        abort_unless(in_array($member->role, ['admin', 'owner']), 403, 'فقط مدیر گروه اجازه‌ی این کار رو داره');
         return $member;
     }
 
@@ -85,7 +81,7 @@ class GroupController extends Controller
         GroupMember::create([
             'group_id' => $group->id,
             'user_id' => $request->user()->id,
-            'role' => 'admin',
+            'role' => 'owner',
         ]);
 
         return response()->json($group);
@@ -165,7 +161,17 @@ class GroupController extends Controller
     {
         $requester = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
         abort_unless($requester, 403);
-        abort_unless($requester->role === 'admin' || $requester->user_id === $userId, 403);
+        $target = GroupMember::where('group_id', $group->id)->where('user_id', $userId)->first();
+        $isLeaving = $requester->user_id === $userId;
+        if (!$isLeaving) {
+            abort_unless($requester->isAdmin(), 403);
+            if ($target && in_array($target->role, ['admin', 'owner']) && !$requester->isOwner()) {
+                abort(403, 'فقط مالک گروه می‌تونه یه مدیر رو حذف کنه');
+            }
+            if ($target && $target->role === 'owner') {
+                abort(403, 'نمی‌شه مالک گروه رو حذف کرد');
+            }
+        }
 
         $removedUser = \App\Models\User::find($userId);
         $isLeaving = $requester->user_id === $userId;
@@ -215,9 +221,13 @@ class GroupController extends Controller
     // PUT /groups/{group}/members/{userId}/role — فقط مدیر، ارتقا/تنزل نقش
     public function updateRole(Request $request, Group $group, int $userId)
     {
-        $this->requireAdmin($request, $group);
+        $requester = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
+        abort_unless($requester && $requester->isOwner(), 403, 'فقط مالک گروه می‌تونه نقش اعضا رو تغییر بده');
 
         $data = $request->validate(['role' => 'required|in:admin,member']);
+
+        $target = GroupMember::where('group_id', $group->id)->where('user_id', $userId)->first();
+        abort_if($target && $target->role === 'owner', 422, 'نمی‌شه نقش مالک رو تغییر داد');
 
         GroupMember::where('group_id', $group->id)->where('user_id', $userId)
             ->update(['role' => $data['role']]);

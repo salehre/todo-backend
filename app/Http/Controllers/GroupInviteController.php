@@ -36,7 +36,7 @@ class GroupInviteController extends Controller
     public function store(Request $request, Group $group)
     {
         $member = GroupMember::where('group_id', $group->id)->where('user_id', $request->user()->id)->first();
-        abort_unless($member && $member->role === 'admin', 403, 'فقط مدیر گروه اجازه‌ی دعوت داره');
+        abort_unless($member && in_array($member->role, ['admin','owner']), 403, 'فقط مدیر و مالک گروه اجازه‌ی دعوت داره');
 
         $data = $request->validate(['user_id' => 'required|integer|exists:users,id']);
 

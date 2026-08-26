@@ -10,7 +10,12 @@ class GroupMember extends Model
 
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return in_array($this->role, ['admin', 'owner']);
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->role === 'owner';
     }
 
     public function user()
