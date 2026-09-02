@@ -46,4 +46,43 @@ class UserController extends Controller
             'social_links' => $user->social_links ?? [],
         ]);
     }
+
+    // GET /users/me/activity
+    public function activity(Request $request)
+    {
+        $userId = $request->user()->id;
+
+        // ۷ روز اخیر رو پایه بذاریم؛ برای هر روز سه‌تا شمارنده حساب می‌کنیم
+        $days = collect(range(6, 0))->map(fn ($i) => now()->subDays($i)->format('Y-m-d'));
+
+        $personalTasks = \App\Models\Task::where('user_id', $userId)
+            ->whereNull('group_id')
+            ->whereDate('created_at', '>=', now()->subDays(6))
+            ->get()
+            ->groupBy(fn ($t) => $t->created_at->format('Y-m-d'));
+
+        $groupTasks = \App\Models\Task::whereNotNull('group_id')
+            ->whereHas('assignees', fn ($q) => $q->where('users.id', $userId))
+            ->whereDate('created_at', '>=', now()->subDays(6))
+            ->get()
+            ->groupBy(fn ($t) => $t->created_at->format('Y-m-d'));
+
+        $completedTasks = \App\Models\Task::where(function ($q) use ($userId) {
+            $q->where('user_id', $userId)->whereNull('group_id');
+        })
+            ->orWhere(function ($q) use ($userId) {
+                $q->whereNotNull('group_id')->whereHas('assignees', fn ($aq) => $aq->where('users.id', $userId));
+            })
+            ->where('is_completed', true)
+            ->whereDate('updated_at', '>=', now()->subDays(6))
+            ->get()
+            ->groupBy(fn ($t) => $t->updated_at->format('Y-m-d'));
+
+        return response()->json([
+            'labels' => $days->values(),
+            'personal' => $days->map(fn ($d) => $personalTasks->get($d, collect())->count())->values(),
+            'group' => $days->map(fn ($d) => $groupTasks->get($d, collect())->count())->values(),
+            'completed' => $days->map(fn ($d) => $completedTasks->get($d, collect())->count())->values(),
+        ]);
+    }
 }

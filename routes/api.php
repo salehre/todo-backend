@@ -71,5 +71,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/groups/{group}/typing', [GroupMessageController::class, 'typing']);
     Route::put('/groups/{group}/read', [GroupMessageController::class, 'markRead']);
     Route::get('/users/search', [UserController::class, 'search']);
+    Route::get('/users/me/activity', [UserController::class, 'activity']);
     Route::get('/users/{id}/profile', [UserController::class, 'showProfile']);
 });
