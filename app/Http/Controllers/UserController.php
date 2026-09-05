@@ -68,11 +68,12 @@ class UserController extends Controller
             ->groupBy(fn ($t) => $t->created_at->format('Y-m-d'));
 
         $completedTasks = \App\Models\Task::where(function ($q) use ($userId) {
-            $q->where('user_id', $userId)->whereNull('group_id');
+            $q->where(function ($iq) use ($userId) {
+                $iq->where('user_id', $userId)->whereNull('group_id');
+            })->orWhere(function ($iq) use ($userId) {
+                $iq->whereNotNull('group_id')->whereHas('assignees', fn ($aq) => $aq->where('users.id', $userId));
+            });
         })
-            ->orWhere(function ($q) use ($userId) {
-                $q->whereNotNull('group_id')->whereHas('assignees', fn ($aq) => $aq->where('users.id', $userId));
-            })
             ->where('is_completed', true)
             ->whereDate('updated_at', '>=', now()->subDays(6))
             ->get()
