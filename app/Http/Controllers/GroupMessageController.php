@@ -26,7 +26,6 @@ class GroupMessageController extends Controller
             ->first();
 
         abort_unless($member, 403);
-
         return $member;
     }
 
@@ -135,8 +134,20 @@ class GroupMessageController extends Controller
     // DELETE /groups/{group}/messages/{message}
     public function destroy(Request $request, Group $group, GroupMessage $message)
     {
-        $this->member($request, $group);
-        abort_unless($message->sender_id === $request->user()->id, 403);
+        $requester = $this->member($request, $group);
+
+        if ($message->sender_id !== $request->user()->id) {
+            // نویسنده‌ی پیام نیستی — فقط تحت شرایط خاص می‌تونی حذف کنی
+            abort_unless($requester->isAdmin(), 403);
+
+            $senderMembership = \App\Models\GroupMember::where('group_id', $group->id)
+                    ->where('user_id', $message->sender_id)->first();
+
+    // ادمین نمی‌تونه پیام ادمین/مالک دیگه رو پاک کنه — فقط پیام عضو عادی
+    if ($senderMembership && in_array($senderMembership->role, ['admin', 'owner']) && !$requester->isOwner()) {
+                    abort(403, 'فقط مالک گروه می‌تونه پیام یه مدیر رو حذف کنه');
+                }
+}
         $this->messageInGroup($group, $message);
         $messageId = $message->id;
         $message->delete();

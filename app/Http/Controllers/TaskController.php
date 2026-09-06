@@ -206,9 +206,20 @@ class TaskController extends Controller
     public function destroy(Request $request)
     {
         $data = $request->validate(['id' => 'required|integer']);
-
         $task = Task::findOrFail($data['id']);
-        abort_unless($task->user_id === $request->user()->id, 403);
+        $userId = $request->user()->id;
+
+        if ($task->user_id !== $userId) {
+            abort_unless($task->group_id, 403);
+            $requester = \App\Models\GroupMember::where('group_id', $task->group_id)
+                ->where('user_id', $userId)->first();
+            abort_unless($requester && $requester->isAdmin(), 403);
+            $creatorMembership = \App\Models\GroupMember::where('group_id', $task->group_id)
+                ->where('user_id', $task->user_id)->first();
+            if ($creatorMembership && in_array($creatorMembership->role, ['admin', 'owner']) && !$requester->isOwner()) {
+                abort(403, 'فقط مالک گروه می‌تونه تسک یه مدیر رو حذف کنه');
+            }
+        }
 
         $task->delete();
         return response()->json(['success' => true]);

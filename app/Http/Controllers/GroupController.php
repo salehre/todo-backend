@@ -33,7 +33,7 @@ class GroupController extends Controller
                 $preview = null;
                 if ($last) {
                     $preview = $last->text ?: ($last->attachments->isNotEmpty()
-                        ? ($last->attachments->first()->type === 'image' ? '📷 Photo' : ($last->attachments->first()->type === 'voice' ? '🎤 Voice message' : '📎 File'))
+                        ? ($last->attachments->first()->type === 'image' ? 'Photo' : ($last->attachments->first()->type === 'voice' ? 'Voice Message' : 'File'))
                         : null);
                 }
                 return [
