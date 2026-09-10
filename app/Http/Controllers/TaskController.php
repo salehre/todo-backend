@@ -107,7 +107,8 @@ class TaskController extends Controller
         $task->load(['steps', 'assignees:id,name,username,avatar', 'group:id,name']);
 
         $assigneeNames = $task->assignees->pluck('name')->implode('، ');
-        $text = "{$request->user()->name} تسک «{$task->title}» رو برای {$assigneeNames} ساخت";
+        $shortTitle = $this->truncateTitle($task->title);
+        $text = "{$request->user()->name} تسک «{$shortTitle}» رو برای {$assigneeNames} ساخت";
         $message = GroupMessage::create([
             'group_id' => $group->id,
             'sender_id' => $request->user()->id,
@@ -154,19 +155,21 @@ class TaskController extends Controller
 
         $task = Task::with('assignees')->findOrFail($data['id']);
         $userId = $request->user()->id;
-        $assigneeIds = $task->assignees->pluck('id');
 
         if ($task->group_id) {
-            abort_unless($userId === $task->user_id || $assigneeIds->contains($userId), 403);
+            $isAssignee = $task->assignees->pluck('id')->contains($userId);
+            $membership = \App\Models\GroupMember::where('group_id', $task->group_id)->where('user_id', $userId)->first();
+            $isGroupAdmin = $membership && $membership->isAdmin();
+            abort_unless($userId === $task->user_id || $isAssignee || $isGroupAdmin, 403);
 
-            if (array_key_exists('is_completed', $data) && ! $assigneeIds->contains($userId)) {
+            if (array_key_exists('is_completed', $data) && ! $isAssignee) {
                 abort(403, 'فقط کسی که این تسک بهش محول شده می‌تونه تکمیلش کنه');
             }
         } else {
             abort_unless($task->user_id === $userId, 403);
         }
 
-        $task->update(collect($data)->except('id')->toArray());
+        $task->update([...collect($data)->except('id')->toArray(), 'last_edited_by' => $userId]);
         $task->load(['steps', 'group:id,name', 'assignees:id,name,username,avatar']);
 
         return response()->json($this->formatTask($task, $userId));
@@ -184,9 +187,13 @@ class TaskController extends Controller
 
         $task = Task::with('assignees')->findOrFail($data['task_id']);
         $userId = $request->user()->id;
-        $allowed = $task->group_id
-            ? $task->assignees->pluck('id')->contains($userId)
-            : $task->user_id === $userId;
+        if ($task->group_id) {
+            $isAssignee = $task->assignees->pluck('id')->contains($userId);
+            $membership = \App\Models\GroupMember::where('group_id', $task->group_id)->where('user_id', $userId)->first();
+            $allowed = $isAssignee || ($membership && $membership->isAdmin());
+        } else {
+            $allowed = $task->user_id === $userId;
+        }
 
         abort_unless($allowed, 403, 'فقط کسی که این تسک بهش محول شده می‌تونه استپ‌هاش رو تغییر بده');
 
@@ -200,6 +207,7 @@ class TaskController extends Controller
             );
         }
 
+        $task->update(['last_edited_by' => $userId]);
         return response()->json($task->steps()->orderBy('position')->get());
     }
 
@@ -255,6 +263,17 @@ class TaskController extends Controller
             'can_complete' => $task->group_id
                 ? $task->assignees->pluck('id')->contains($currentUserId)
                 : $task->user_id === $currentUserId,
+            'last_edited_by' => $task->lastEditor ? [
+                'id' => $task->lastEditor->id,
+                'name' => $task->lastEditor->name,
+            ] : null,
         ];
+    }
+
+    private function truncateTitle(string $title, int $words = 3): string
+    {
+        $parts = preg_split('/\s+/', trim($title));
+        if (count($parts) <= $words) return $title;
+        return implode(' ', array_slice($parts, 0, $words)) . '...';
     }
 }

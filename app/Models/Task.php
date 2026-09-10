@@ -17,7 +17,13 @@ class Task extends Model
         'is_completed',
         'group_id',
         'ordered_steps',
+        'last_edited_by',
     ];
+
+    public function lastEditor()
+    {
+        return $this->belongsTo(User::class, 'last_edited_by');
+    }
 
     protected $casts = [
         'is_completed' => 'boolean',
