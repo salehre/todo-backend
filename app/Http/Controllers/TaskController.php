@@ -208,7 +208,14 @@ class TaskController extends Controller
         }
 
         $task->update(['last_edited_by' => $userId]);
-        return response()->json($task->steps()->orderBy('position')->get());
+        $task->load('lastEditor');
+        return response()->json([
+            'steps' => $task->steps()->orderBy('position')->get(),
+            'last_edited_by' => $task->lastEditor ? [
+                'id' => $task->lastEditor->id,
+                'name' => $task->lastEditor->name,
+            ] : null,
+        ]);
     }
 
     public function destroy(Request $request)
