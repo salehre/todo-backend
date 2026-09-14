@@ -250,6 +250,12 @@ class TaskController extends Controller
 
     private function formatTask(Task $task, int $currentUserId): array
     {
+        $isAssignee = $task->assignees->pluck('id')->contains($currentUserId);
+        $isGroupAdmin = false;
+        if ($task->group_id) {
+            $membership = GroupMember::where('group_id', $task->group_id)->where('user_id', $currentUserId)->first();
+            $isGroupAdmin = $membership && $membership->isAdmin();
+        }
         return [
             'id' => $task->id,
             'title' => $task->title,
@@ -268,7 +274,10 @@ class TaskController extends Controller
                 'avatarUrl' => $u->avatar ? asset('storage/' . $u->avatar) : null,
             ]),
             'can_complete' => $task->group_id
-                ? $task->assignees->pluck('id')->contains($currentUserId)
+                ? $isAssignee
+                : $task->user_id === $currentUserId,
+            'can_edit' => $task->group_id
+                ? ($task->user_id === $currentUserId || $isAssignee || $isGroupAdmin)
                 : $task->user_id === $currentUserId,
             'last_edited_by' => $task->lastEditor ? [
                 'id' => $task->lastEditor->id,
