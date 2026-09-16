@@ -285,11 +285,10 @@ class TaskController extends Controller
             ] : null,
         ];
     }
-
-    private function truncateTitle(string $title, int $words = 3): string
+    private function truncateTitle(string $title, int $chars = 15): string
     {
-        $parts = preg_split('/\s+/', trim($title));
-        if (count($parts) <= $words) return $title;
-        return implode(' ', array_slice($parts, 0, $words)) . '...';
+        $title = trim($title);
+        if (mb_strlen($title) <= $chars) return $title;
+        return mb_substr($title, 0, $chars) . '...';
     }
 }
