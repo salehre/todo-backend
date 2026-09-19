@@ -51,6 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/groups/{group}/tasks', [TaskController::class, 'storeGroupTask']);
     Route::get('/runbooks', [RunbookController::class, 'index']);
     Route::post('/runbooks', [RunbookController::class, 'store']);
+    Route::get('/runbooks/template', [RunbookController::class, 'template']);
     Route::get('/runbooks/{runbook}', [RunbookController::class, 'show']);
     Route::delete('/runbooks/{runbook}', [RunbookController::class, 'destroy']);
     Route::post('/runbooks/{runbook}/tasks', [RunbookController::class, 'storeTask']);

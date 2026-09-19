@@ -163,7 +163,7 @@ class TaskController extends Controller
             abort_unless($userId === $task->user_id || $isAssignee || $isGroupAdmin, 403);
 
             if (array_key_exists('is_completed', $data) && ! $isAssignee) {
-                abort(403, 'فقط کسی که این تسک بهش محول شده می‌تونه تکمیلش کنه');
+                abort_unless($isAssignee || ($task->from_runbook && $task->assignees->isEmpty()), 403, 'فقط کسی که این تسک بهش محول شده می‌تونه تکمیلش کنه');
             }
         } else {
             abort_unless($task->user_id === $userId, 403);
@@ -190,7 +190,7 @@ class TaskController extends Controller
         if ($task->group_id) {
             $isAssignee = $task->assignees->pluck('id')->contains($userId);
             $membership = \App\Models\GroupMember::where('group_id', $task->group_id)->where('user_id', $userId)->first();
-            $allowed = $isAssignee || ($membership && $membership->isAdmin());
+            $allowed = $isAssignee || ($membership && $membership->isAdmin()) || ($task->from_runbook && $task->assignees->isEmpty());
         } else {
             $allowed = $task->user_id === $userId;
         }
@@ -251,6 +251,7 @@ class TaskController extends Controller
     private function formatTask(Task $task, int $currentUserId): array
     {
         $isAssignee = $task->assignees->pluck('id')->contains($currentUserId);
+        $openRunbookTask = $task->from_runbook && $task->assignees->isEmpty();
         $isGroupAdmin = false;
         if ($task->group_id) {
             $membership = GroupMember::where('group_id', $task->group_id)->where('user_id', $currentUserId)->first();
@@ -274,7 +275,7 @@ class TaskController extends Controller
                 'avatarUrl' => $u->avatar ? asset('storage/' . $u->avatar) : null,
             ]),
             'can_complete' => $task->group_id
-                ? $isAssignee
+                ? ($isAssignee || $openRunbookTask)
                 : $task->user_id === $currentUserId,
             'can_edit' => $task->group_id
                 ? ($task->user_id === $currentUserId || $isAssignee || $isGroupAdmin)

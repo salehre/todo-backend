@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Mail\VerificationCodeMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -178,7 +180,7 @@ class AuthController extends Controller
             'verification_code_expires_at' => now()->addMinutes(10),
         ]);
 
-        \Illuminate\Support\Facades\Log::info("کد تأیید برای {$user->email}: {$code}");
+        Mail::to($user->email)->send(new VerificationCodeMail($code));
     }
 
     private function codeIsValid(User $user, string $code): bool
