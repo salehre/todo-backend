@@ -93,19 +93,25 @@ class GroupMessageController extends Controller
             }}
        $message->load(['reactions', 'task', 'attachments']);
 
+        $validMentionIds = [];
+        if (!empty($data['mentions'])) {
+            $validMentionIds = $group->members()->whereIn('users.id', $data['mentions'])->pluck('users.id')->all();
+            foreach ($validMentionIds as $userId) {
+                MessageMention::create(['message_id' => $message->id, 'user_id' => $userId]);
+            }
+            $message->load('mentions');
+        }
+
+        $repliedToSenderId = !empty($data['reply_to'])
+            ? GroupMessage::where('id', $data['reply_to'])->value('sender_id')
+            : null;
+
         $otherMemberIds = \App\Models\GroupMember::where('group_id', $group->id)
             ->where('user_id', '!=', $request->user()->id)
             ->pluck('user_id');
         foreach ($otherMemberIds as $memberId) {
-            event(new \App\Events\MessageNotification($memberId, $group->id, $group->name));
-        }
-
-        if (!empty($data['mentions'])) {
-            $validMentions = $group->members()->whereIn('users.id', $data['mentions'])->pluck('users.id');
-            foreach ($validMentions as $userId) {
-                MessageMention::create(['message_id' => $message->id, 'user_id' => $userId]);
-            }
-            $message->load('mentions');
+            $isMentionOrReply = in_array($memberId, $validMentionIds) || $memberId === $repliedToSenderId;
+            event(new \App\Events\MessageNotification($memberId, $group->id, $group->name, $isMentionOrReply));
         }
 
         $formatted = $this->formatMessage($message);
@@ -211,6 +217,9 @@ class GroupMessageController extends Controller
                 ['message_id' => $message->id, 'user_id' => $userId],
                 ['emoji' => $data['emoji']]
             );
+            if ($message->sender_id !== $userId) {
+                event(new \App\Events\ReactionNotification($message->sender_id, $group->id, $group->name));
+            }
         }
 
         $formatted = $this->formatMessage($message->fresh()->load(['reactions', 'task']));
@@ -224,6 +233,8 @@ class GroupMessageController extends Controller
     {
         $member = $this->member($request, $group);
         $data = $request->validate(['message_id' => 'required|integer|exists:group_messages,id']);
+
+        $member->update(['notifications_cleared_at' => now()]);
 
         // فقط اگه پیام جدیدتر از آخرین‌خوانده‌شده باشه آپدیت کن (عقب نره)
         if (! $member->last_read_message_id || $data['message_id'] > $member->last_read_message_id) {

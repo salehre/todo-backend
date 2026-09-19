@@ -22,13 +22,18 @@ class GroupController extends Controller
     // GET /groups
     public function index(Request $request)
     {
+        $userId = $request->user()->id;
+        $myMemberships = GroupMember::where('user_id', $userId)
+            ->get(['group_id', 'last_read_message_id', 'notifications_cleared_at'])
+            ->keyBy('group_id');
+
         $groups = $request->user()->groups()
             ->withCount('members')
             ->with(['latestMessage.attachments'])
             ->get()
             ->sortByDesc(fn ($g) => optional($g->latestMessage)->created_at ?? $g->created_at)
             ->values()
-            ->map(function ($g) {
+            ->map(function ($g) use ($userId, $myMemberships) {
                 $last = $g->latestMessage;
                 $preview = null;
                 if ($last) {
@@ -36,6 +41,30 @@ class GroupController extends Controller
                         ? ($last->attachments->first()->type === 'image' ? 'Photo' : ($last->attachments->first()->type === 'voice' ? 'Voice Message' : 'File'))
                         : null);
                 }
+
+                $membership = $myMemberships->get($g->id);
+                $lastReadId = $membership->last_read_message_id ?? 0;
+                $clearedAt = $membership->notifications_cleared_at ?? null;
+
+                $unreadMessageIds = GroupMessage::where('group_id', $g->id)
+                    ->where('sender_id', '!=', $userId)
+                    ->where('id', '>', $lastReadId)
+                    ->pluck('id');
+
+                $hasMention = \App\Models\MessageMention::where('user_id', $userId)
+                    ->whereIn('message_id', $unreadMessageIds)
+                    ->exists();
+
+                $myMessageIdsInGroup = GroupMessage::where('group_id', $g->id)
+                    ->where('sender_id', $userId)
+                    ->pluck('id');
+
+                $reactionQuery = \App\Models\MessageReaction::where('user_id', '!=', $userId)
+                    ->whereIn('message_id', $myMessageIdsInGroup);
+                if ($clearedAt) $reactionQuery
+                    ->where('created_at', '>', $clearedAt);
+                $hasReaction = $reactionQuery->exists();
+
                 return [
                     'id' => $g->id,
                     'name' => $g->name,
@@ -45,6 +74,9 @@ class GroupController extends Controller
                     'last_message_at' => optional($last)->created_at,
                     'last_message_preview' => $preview,
                     'created_at' => $g->created_at,
+                    'unread_count' => $unreadMessageIds->count(),
+                    'has_mention' => $hasMention,
+                    'has_reaction' => $hasReaction,
                 ];
             });
         return response()->json($groups);

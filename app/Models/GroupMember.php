@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class GroupMember extends Model
 {
-    protected $fillable = ['group_id', 'user_id', 'last_read_message_id', 'role'];
+    protected $fillable = ['group_id', 'user_id', 'last_read_message_id', 'role', 'notifications_cleared_at'];
 
     public function isAdmin(): bool
     {
