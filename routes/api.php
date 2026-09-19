@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\RunbookController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GroupController;
@@ -48,6 +49,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/tasks/delete', [TaskController::class, 'destroy']);
     Route::get('/groups/{group}/tasks', [TaskController::class, 'groupTasks']);
     Route::post('/groups/{group}/tasks', [TaskController::class, 'storeGroupTask']);
+    Route::get('/runbooks', [RunbookController::class, 'index']);
+    Route::post('/runbooks', [RunbookController::class, 'store']);
+    Route::get('/runbooks/{runbook}', [RunbookController::class, 'show']);
+    Route::delete('/runbooks/{runbook}', [RunbookController::class, 'destroy']);
+    Route::post('/runbooks/{runbook}/tasks', [RunbookController::class, 'storeTask']);
+    Route::put('/runbooks/{runbook}/tasks/{task}', [RunbookController::class, 'updateTask']);
+    Route::delete('/runbooks/{runbook}/tasks/{task}', [RunbookController::class, 'destroyTask']);
     Route::get('/groups', [GroupController::class, 'index']);
     Route::post('/groups', [GroupController::class, 'store']);
     Route::get('/groups/{group}', [GroupController::class, 'show']);

@@ -18,6 +18,7 @@ class Task extends Model
         'group_id',
         'ordered_steps',
         'last_edited_by',
+        'from_runbook',
     ];
 
     public function lastEditor()

@@ -101,12 +101,14 @@ class GroupController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
+            'runbook_id' => 'nullable|exists:runbooks,id',
         ]);
 
         $group = Group::create([
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'created_by' => $request->user()->id,
+            'runbook_id' => $data['runbook_id'] ?? null,
         ]);
 
         // سازنده‌ی گروه خودکار مدیرشه
@@ -115,6 +117,22 @@ class GroupController extends Controller
             'user_id' => $request->user()->id,
             'role' => 'owner',
         ]);
+
+        if (!empty($data['runbook_id'])) {
+            $runbook = \App\Models\Runbook::with('tasks')->find($data['runbook_id']);
+            foreach ($runbook->tasks as $rt) {
+                $task = \App\Models\Task::create([
+                    'user_id' => $request->user()->id,
+                    'group_id' => $group->id,
+                    'title' => $rt->title,
+                    'description' => $rt->description,
+                    'priority' => $rt->priority,
+                    'is_completed' => false,
+                    'from_runbook' => true,
+                ]);
+                $task->assignees()->attach($request->user()->id);
+            }
+        }
 
         return response()->json($group);
     }

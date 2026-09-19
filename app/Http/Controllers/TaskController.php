@@ -283,6 +283,7 @@ class TaskController extends Controller
                 'id' => $task->lastEditor->id,
                 'name' => $task->lastEditor->name,
             ] : null,
+            'from_runbook' => (bool) $task->from_runbook,
         ];
     }
     private function truncateTitle(string $title, int $chars = 15): string
