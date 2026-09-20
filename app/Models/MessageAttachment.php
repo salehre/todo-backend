@@ -11,6 +11,6 @@ class MessageAttachment extends Model
 
     public function getUrlAttribute(): string
     {
-        return asset('storage/' . $this->path);
+        return asset('/media/' . $this->path);
     }
 }
