@@ -17,8 +17,9 @@ class VerificationCodeMail extends Mailable
 
     public function build()
     {
-        return $this->subject('کد تأیید شما')
+        return $this->subject('کد تأیید Todolist')
             ->view('emails.verification-code')
+            ->text('emails.verification-code-text')
             ->with(['code' => $this->code]);
     }
 }
