@@ -8,6 +8,7 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\GroupMessageController;
 use App\Http\Controllers\GroupInviteController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PushSubscriptionController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Broadcast;
@@ -42,6 +43,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/avatar', [AuthController::class, 'uploadAvatar']);
     Route::post('/auth/cover', [AuthController::class, 'uploadCover']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+    // ─── Web Push ──────────────────────────────────────────────
+    Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
+    Route::post('/push/subscribe', [PushSubscriptionController::class, 'store']);
+    Route::post('/push/unsubscribe', [PushSubscriptionController::class, 'destroy']);
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::post('/tasks/create', [TaskController::class, 'store']);
     Route::put('/tasks/updateTask', [TaskController::class, 'updateTask']);
